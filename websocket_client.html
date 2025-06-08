@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gas Sensor WebSocket Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align items to the start to make space for the title */
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 600px;
+        }
+        .message-box {
+            background-color: #e0f2f4; /* Light teal */
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #2c3e50;
+            word-wrap: break-word; /* Ensure long messages wrap */
+        }
+        .message-box:last-child {
+            margin-bottom: 0;
+        }
+        .message-box strong {
+            color: #2196f3; /* Blue for sensor_id/gas_type */
+        }
+        .status-connected {
+            color: #4CAF50; /* Green */
+        }
+        .status-disconnected {
+            color: #F44336; /* Red */
+        }
+        .status-error {
+            color: #FFC107; /* Amber */
+        }
+        .button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .button-primary {
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            color: white;
+        }
+        .button-secondary {
+            background-color: #ef4444; /* Tailwind red-500 */
+            color: white;
+        }
+        .input-field {
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body class="p-4 bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="container bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Gas Sensor Live Data</h1>
+
+        <div class="mb-4 flex justify-between items-center">
+            <div class="text-lg font-medium">Status: <span id="wsStatus" class="status-disconnected">Disconnected</span></div>
+            <div>
+                <button id="connectButton" class="button button-primary mr-2">Connect WebSocket</button>
+                <button id="disconnectButton" class="button button-secondary">Disconnect WebSocket</button>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <label for="messageInput" class="block text-gray-700 text-sm font-bold mb-2">
+                Send Message to Server:
+            </label>
+            <div class="flex">
+                <input type="text" id="messageInput" class="input-field mr-2" placeholder="e.g., request_data">
+                <button id="sendMessageButton" class="button button-primary">Send</button>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-semibold mb-4 text-gray-700">Received Messages:</h2>
+        <div id="messages" class="h-64 overflow-y-auto border border-gray-300 rounded-md p-4 bg-gray-50">
+            <!-- Messages will appear here -->
+            <p class="text-gray-500 text-center">No messages yet. Connect and send some data!</p>
+        </div>
+    </div>
+
+    <script>
+        const wsStatus = document.getElementById('wsStatus');
+        const messagesDiv = document.getElementById('messages');
+        const connectButton = document.getElementById('connectButton');
+        const disconnectButton = document.getElementById('disconnectButton');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+
+        let ws = null; // Declare ws variable globally
+
+        function appendMessage(msg) {
+            const p = document.createElement('p');
+            p.className = 'message-box';
+            p.innerHTML = msg; // Use innerHTML to allow for formatting
+            messagesDiv.appendChild(p);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+            // Remove "No messages yet" if it's there
+            const noMessages = messagesDiv.querySelector('.text-gray-500');
+            if (noMessages) {
+                noMessages.remove();
+            }
+        }
+
+        function updateStatus(statusText, className) {
+            wsStatus.textContent = statusText;
+            wsStatus.className = className; // Update class for styling
+        }
+
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                appendMessage('<p class="text-yellow-600">WebSocket is already connected.</p>');
+                return;
+            }
+
+            updateStatus('Connecting...', 'text-blue-500');
+            ws = new WebSocket("ws://localhost:8000/ws/");
+
+            ws.onopen = (event) => {
+                updateStatus('Connected', 'status-connected');
+                appendMessage('<strong>Connection opened!</strong>');
+                // You can send an initial message or request data here
+                // ws.send(JSON.stringify({ type: "request_latest_data" }));
+            };
+
+            ws.onmessage = (event) => {
+                console.log("Message from server:", event.data);
+                let messageContent = event.data;
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.sensor_id && data.gas_type && data.value !== undefined) {
+                        messageContent = `<strong>Sensor ID:</strong> ${data.sensor_id}, <strong>Gas Type:</strong> ${data.gas_type}, <strong>Value:</strong> ${data.value}, <strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}`;
+                    } else {
+                        messageContent = `<strong>Server:</strong> ${JSON.stringify(data, null, 2)}`;
+                    }
+                } catch (e) {
+                    // Not a JSON message, display as plain text
+                    messageContent = `<strong>Server:</strong> ${event.data}`;
+                }
+                appendMessage(messageContent);
+            };
+
+            ws.onclose = (event) => {
+                updateStatus('Disconnected', 'status-disconnected');
+                appendMessage(`<strong>Connection closed:</strong> Code: ${event.code}, Reason: ${event.reason || 'No reason'}`);
+                ws = null; // Clear ws reference
+            };
+
+            ws.onerror = (error) => {
+                updateStatus('Error', 'status-error');
+                appendMessage(`<strong>WebSocket Error:</strong> ${error.message || 'Unknown error'}`);
+                console.error("WebSocket error:", error);
+                ws = null; // Clear ws reference
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+            } else {
+                appendMessage('<p class="text-yellow-600">WebSocket is not connected.</p>');
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message === "") {
+                appendMessage('<p class="text-red-600">Please enter a message to send.</p>');
+                return;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    // Try to send as JSON, otherwise send as plain text
+                    const jsonMessage = JSON.parse(message);
+                    ws.send(JSON.stringify(jsonMessage));
+                    appendMessage(`<strong>You:</strong> ${JSON.stringify(jsonMessage, null, 2)}`);
+                } catch (e) {
+                    ws.send(message);
+                    appendMessage(`<strong>You (text):</strong> ${message}`);
+                }
+                messageInput.value = ''; // Clear input
+            } else {
+                appendMessage('<p class="text-red-600">WebSocket is not connected. Please connect first.</p>');
+            }
+        }
+
+        connectButton.addEventListener('click', connectWebSocket);
+        disconnectButton.addEventListener('click', disconnectWebSocket);
+        sendMessageButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Optional: Connect automatically on page load
+        // connectWebSocket();
+    </script>
+</body>
+</html>
