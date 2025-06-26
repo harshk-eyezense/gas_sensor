@@ -8,7 +8,7 @@ class ConnectionManager:
     def __init__(self):
         # Stores active WebSocket connections.
         # Could be extended to store connections by user_id or sensor_id if needed.
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
         print("ConnectionManager initialized.")
 
     async def connect(self, websocket: WebSocket):

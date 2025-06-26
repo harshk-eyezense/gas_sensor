@@ -2,3 +2,5 @@ fastapi[all]
 uvicorn[standard]
 influxdb-client
 python-dotenv
+httpx
+pydantic-settings

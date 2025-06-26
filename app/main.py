@@ -1,7 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import sensor_routes
 from app.websockets import ws_routes
+from app.routers import youtube_stream_router
+from app.routers import influxdb_query_router
+from app.routers import acoustic_router
 from app.core.influxdb_client import close_influxdb_client, write_sensor_reading # Import write_sensor_reading directly
 from app.websockets.ws_routes import push_sensor_reading_to_websockets
 from app.models.sensor import GasSensorReading
@@ -29,7 +32,9 @@ app.include_router(sensor_routes.router)
 
 # Include the WebSocket router
 app.include_router(ws_routes.router)
-
+app.include_router(youtube_stream_router.router) # YouTube stream lookup
+app.include_router(influxdb_query_router.router)
+app.include_router(acoustic_router.router)
 @app.on_event("startup")
 async def startup_event():
     """

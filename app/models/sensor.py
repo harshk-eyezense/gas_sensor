@@ -62,3 +62,12 @@ class GasSensorDelete(BaseModel):
                 "end_time": "2025-06-07T23:59:59+00:00"
             }
         }
+class GasSensorReading(BaseModel):
+    """
+    Pydantic model for a single gas sensor reading.
+    """
+    sensor_id: str = Field(..., description="Unique identifier for the sensor.")
+    gas_type: str = Field(..., description="The type of gas being detected (e.g., CO2, Methane, VOC).")
+    value: float = Field(..., description="Sensor reading value.")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="UTC timestamp of the reading.")
+    
