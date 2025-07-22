@@ -6,7 +6,7 @@ import asyncio # Import asyncio to demonstrate a slight delay if needed for debu
 from datetime import datetime
 from typing import Optional
 import random
-
+from app.core.influxdb_client import write_sensor_reading
 
 router = APIRouter(
     prefix="/ws",
@@ -92,7 +92,7 @@ async def mock_stream_endpoint(
 ):
     """
     websocket endpoint for continuous streaming of mock sensor data.
-    Generates and sends data at specified intervals.
+    Generates, writes to InfluxDB, sends data at specified intervals.
     """
     await websocket.accept()
     print(f"Mock streaming Websocket connection established: {websocket.client}")
@@ -101,6 +101,22 @@ async def mock_stream_endpoint(
     try:
         while True:
             mock_reading = generate_mock_reading(sensor_id, gas_type)
+
+            print(f"DEBUG: Attempting to write mock data to influxdb: {mock_reading.value}")
+
+            try:
+                write_sensor_reading(
+                    sensor_id=mock_reading.sensor_id,
+                    gas_type=mock_reading.gas_type,
+                    value=mock_reading.value,
+                    timestamp=mock_reading.timestamp
+                )
+                print(f"Successfully wrote mock data point to InfluxDB: {mock_reading.value}")
+            except Exception as e:
+                print(f"ERROR: Failed to write mock data point to InfluxDB: {e}")
+                import traceback
+                traceback.print_exc()
+
             message_dict = mock_reading.model_dump(mode='json')
 
             await websocket.send_text(json.dumps({

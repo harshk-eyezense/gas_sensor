@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #1a202c; /* Dark background for sidebar */
+            color: #e2e8f0;
+            padding: 1.5rem 1rem;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+            font-weight: 500;
+        }
+        .sidebar-item:hover {
+            background-color: #2d3748; /* Darker hover */
+            color: #fff;
+        }
+        .sidebar-item.active {
+            background-color: #4299e1; /* Blue for active */
+            color: #fff;
+        }
+        .sidebar-item i {
+            margin-right: 0.75rem;
+            font-size: 1.25rem;
+        }
+        .sidebar-subsection {
+            padding-left: 2.5rem; /* Indent subsections */
+            font-size: 0.9rem;
+        }
+        .sidebar-subsection .sidebar-item {
+            padding-left: 1rem; /* Adjust padding for sub-items */
+        }
+        .main-content {
+            flex-grow: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        .content-section {
+            display: none; /* Hidden by default */
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .content-section.active {
+            display: block; /* Show active section */
+        }
+        .chart-container {
+            width: 100%;
+            min-height: 350px; /* Ensure chart has space */
+        }
+        .chart-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            align-items: flex-end;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+            color: #4a5568;
+        }
+        .input-field {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.9rem;
+        }
+        .button {
+            padding: 0.6rem 1.2rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            white-space: nowrap; /* Prevent button text from wrapping */
+        }
+        .button-primary { background-color: #4299e1; color: white; } /* Tailwind blue-500 */
+        .button-primary:hover { background-color: #3182ce; } /* Darker blue */
+        .button-secondary { background-color: #e2e8f0; color: #2d3748; }
+        .button-secondary:hover { background-color: #cbd5e0; }
+        .button-danger { background-color: #ef4444; color: white; }
+        .button-danger:hover { background-color: #dc2626; }
+        .message-box {
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            word-wrap: break-word;
+            background-color: #f0f4f8;
+            color: #2d3748;
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #d32f2f;
+            border-left: 4px solid #F44336;
+        }
+        .info-message {
+            background-color: #e0f2f7;
+            color: #0288d1;
+            border-left: 4px solid #03A9F4;
+        }
+        .youtube-embed-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            height: 0;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .youtube-embed-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1 class="text-2xl font-bold mb-6 text-center">Dashboard</h1>
+        
+        <div class="sidebar-item" data-device-id="1" data-device-type="turtleBot">
+            <i class="fas fa-robot"></i> TurtleBot
+        </div>
+        <div class="sidebar-item" data-device-id="2" data-device-type="djiDrone">
+            <i class="fas fa-plane"></i> DJI Drone
+        </div>
+        <div class="sidebar-item" data-device-id="3" data-device-type="go2Pro">
+            <i class="fas fa-camera"></i> Go2Pro
+        </div>
+        <div class="sidebar-item" data-device-id="4" data-device-type="dronganFly">
+            <i class="fas fa-dragon"></i> DragonFly
+        </div>
+
+        <div class="sidebar-item active" data-section="stationary">
+            <i class="fas fa-house-chimney-window"></i> Stationary
+        </div>
+        <div class="sidebar-subsection">
+            <div class="sidebar-item active" data-section="stationary-acoustic" data-device-id="5" data-sensor-type="microphone">
+                <i class="fas fa-waveform"></i> Acoustic
+            </div>
+            <div class="sidebar-item" data-section="stationary-chemical" data-device-id="5" data-sensor-type="CO2">
+                <i class="fas fa-flask"></i> Chemical
+            </div>
+            <div class="sidebar-item" data-section="stationary-video" data-device-id="5" data-channel="@redredsquirrel">
+                <i class="fas fa-video"></i> Video
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- Acoustic Waveform Section -->
+        <div id="stationary-acoustic-section" class="content-section active">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">Acoustic Waveform (Stationary)</h2>
+            <div class="chart-controls">
+                <div class="input-group">
+                    <label for="acousticDeviceId">Device ID:</label>
+                    <input type="text" id="acousticDeviceId" class="input-field" value="stationary_acoustic_01">
+                </div>
+                <div class="input-group">
+                    <label for="acousticSensorType">Sensor Type:</label>
+                    <input type="text" id="acousticSensorType" class="input-field" value="microphone">
+                </div>
+                <div class="input-group">
+                    <label for="acousticLimit">Limit:</label>
+                    <input type="number" id="acousticLimit" class="input-field" value="1000" min="1">
+                </div>
+                <button id="loadAcousticData" class="button button-primary">Load Data</button>
+            </div>
+            <div id="acousticChart" class="chart-container"></div>
+            <h3 class="text-xl font-semibold mt-6 mb-2 text-gray-700">Raw Acoustic Data:</h3>
+            <div id="acousticMessages" class="messages-area">
+                <p class="text-gray-500 text-center">No acoustic data loaded yet.</p>
+            </div>
+        </div>
+
+        <!-- Chemical (Gas Sensor) Waveform Section -->
+        <div id="stationary-chemical-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">Chemical Sensor Waveform (Stationary)</h2>
+            <div class="chart-controls">
+                <div class="input-group">
+                    <label for="gasSensorId">Sensor ID:</label>
+                    <input type="text" id="gasSensorId" class="input-field" value="mock_sensor_01">
+                </div>
+                <div class="input-group">
+                    <label for="gasType">Gas Type:</label>
+                    <input type="text" id="gasType" class="input-field" value="CO2">
+                </div>
+                <div class="input-group">
+                    <label for="gasLimit">Limit:</label>
+                    <input type="number" id="gasLimit" class="input-field" value="100" min="1">
+                </div>
+                <button id="loadGasData" class="button button-primary">Load Data</button>
+                <button id="startMockGasStream" class="button button-primary">Start Live Stream</button>
+                <button id="stopMockGasStream" class="button button-danger">Stop Live Stream</button>
+            </div>
+            <div id="gasChart" class="chart-container"></div>
+            <h3 class="text-xl font-semibold mt-6 mb-2 text-gray-700">Raw Gas Data:</h3>
+            <div id="gasMessages" class="messages-area">
+                <p class="text-gray-500 text-center">No gas data loaded yet.</p>
+            </div>
+        </div>
+
+        <!-- Video (YouTube Live Stream) Section -->
+        <div id="stationary-video-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">YouTube Live Stream (Stationary)</h2>
+            <div class="chart-controls">
+                <div class="input-group">
+                    <label for="youtubeChannel">Channel/Handle:</label>
+                    <input type="text" id="youtubeChannel" class="input-field" value="@redredsquirrel">
+                </div>
+                <button id="loadYouTubeStream" class="button button-primary">Load Live Stream</button>
+            </div>
+            <div id="youtubeStreamContainer" class="youtube-embed-container">
+                <p class="text-gray-500 text-center p-4">Click "Load Live Stream" to view.</p>
+            </div>7
+            <h3 class="text-xl font-semibold mt-6 mb-2 text-gray-700">Stream Status:</h3>
+            <div id="youtubeMessages" class="messages-area">
+                <p class="text-gray-500 text-center">No stream status yet.</p>
+            </div>
+        </div>
+
+        <!-- Placeholder Sections for other devices -->
+        <div id="turtleBot-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">TurtleBot Data</h2>
+            <p class="text-gray-600">Content for TurtleBot data will go here.</p>
+        </div>
+        <div id="djiDrone-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">DJI Drone Data</h2>
+            <p class="text-gray-600">Content for DJI Drone data will go here.</p>
+        </div>
+        <div id="go2Pro-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">Go2Pro Data</h2>
+            <p class="text-gray-600">Content for Go2Pro data will go here.</p>
+        </div>
+        <div id="dronganFly-section" class="content-section">
+            <h2 class="text-3xl font-bold mb-6 text-gray-800">DragonFly Data</h2>
+            <p class="text-gray-600">Content for DragonFly data will go here.</p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Global Variables and Utility Functions ---
+        const API_BASE_URL = "http://127.0.0.1:8000"; // Your FastAPI backend URL
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+        }
+
+        function setActiveSidebarItem(element) {
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+
+        function appendMessage(containerId, msg, className = '') {
+            const container = document.getElementById(containerId);
+            const p = document.createElement('p');
+            p.className = `message-box ${className}`;
+            p.innerHTML = msg;
+            container.appendChild(p);
+            container.scrollTop = container.scrollHeight;
+            // Remove "No data loaded yet" message if present
+            const noMessages = container.querySelector('.text-gray-500');
+            if (noMessages) {
+                noMessages.remove();
+            }
+        }
+
+        // --- Chart Initialization (Common Options) ---
+        const commonChartOptions = {
+            chart: {
+                type: 'line',
+                height: 300,
+                animations: {
+                    enabled: true,
+                    easing: 'linear',
+                    dynamicAnimation: {
+                        speed: 1000 // Default, can be overridden
+                    }
+                },
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                foreColor: '#373d3f'
+            },
+            xaxis: {
+                type: 'datetime',
+                labels: {
+                    datetimeFormatter: {
+                        year: 'yyyy', month: 'MMM \'yy', day: 'dd MMM',
+                        hour: 'HH:mm', min: 'HH:mm', sec: 'HH:mm:ss'
+                    }
+                },
+                tickAmount: 5,
+                title: { text: 'Time', style: { color: '#4a5568' } }
+            },
+            yaxis: {
+                title: { text: 'Value', style: { color: '#4a5568' } },
+                labels: { formatter: function (val) { return val.toFixed(2); } }
+            },
+            stroke: { curve: 'smooth', width: 4 },
+            markers: { size: 4, strokeColors: '#fff', strokeWidth: 2, hover: { size: 7 } },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.9, stops: [0, 100],
+                }
+            },
+            grid: {
+                borderColor: '#e7e7e7', row: { colors: ['#f3f3f3', 'transparent'], opacity: 0.5 },
+            },
+            tooltip: { x: { format: 'HH:mm:ss' } },
+            dataLabels: { enabled: false }
+        };
+
+        // --- Acoustic Chart Setup ---
+        const acousticChartElement = document.getElementById('acousticChart');
+        let acousticApexChart;
+        let acousticDataPoints = []; // Data source for acoustic chart
+
+        const acousticChartOptions = {
+            ...commonChartOptions,
+            series: [{ name: 'Acoustic Value', data: acousticDataPoints }],
+            yaxis: {
+                ...commonChartOptions.yaxis,
+                title: { text: 'Acoustic Value', style: { color: '#4a5568' } },
+                min: 0 // Assuming acoustic values are non-negative
+            },
+            stroke: { ...commonChartOptions.stroke, colors: ['#4CAF50'] }, // Green for acoustic
+            markers: { ...commonChartOptions.markers, colors: ['#4CAF50'] },
+            fill: {
+                ...commonChartOptions.fill,
+                gradient: {
+                    ...commonChartOptions.fill.gradient,
+                    colorStops: [{ offset: 0, color: '#81C784', opacity: 0.7 }, { offset: 100, color: '#C8E6C9', opacity: 0.9 }]
+                }
+            },
+        };
+        acousticApexChart = new ApexCharts(acousticChartElement, acousticChartOptions);
+        acousticApexChart.render();
+
+        // --- Gas Chart Setup (from previous iteration) ---
+        const gasChartElement = document.getElementById('gasChart');
+        let gasApexChart;
+        let gasDataPoints = []; // Data source for gas chart
+        let mockGasWs = null; // WebSocket for live gas stream
+
+        const gasChartOptions = {
+            ...commonChartOptions,
+            series: [{ name: 'Gas Value', data: gasDataPoints }],
+            yaxis: {
+                ...commonChartOptions.yaxis,
+                title: { text: 'Gas Value', style: { color: '#4a5568' } },
+                min: 0,
+                max: 100 // Max 100 for gas values
+            },
+            stroke: { ...commonChartOptions.stroke, colors: ['#e65100'] }, // Orange for gas
+            markers: { ...commonChartOptions.markers, colors: ['#e65100'] },
+            fill: {
+                ...commonChartOptions.fill,
+                gradient: {
+                    ...commonChartOptions.fill.gradient,
+                    colorStops: [{ offset: 0, color: '#ff9800', opacity: 0.7 }, { offset: 100, color: '#ffe0b2', opacity: 0.9 }]
+                }
+            },
+        };
+        gasApexChart = new ApexCharts(gasChartElement, gasChartOptions);
+        gasApexChart.render();
+
+
+        // --- Event Listeners for Sidebar Navigation ---
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', (event) => {
+                const section = item.dataset.section;
+                const deviceId = item.dataset.deviceId;
+                const sensorType = item.dataset.sensorType;
+                const channel = item.dataset.channel;
+
+                setActiveSidebarItem(item);
+
+                if (section) {
+                    showSection(section + '-section'); // e.g., 'stationary-acoustic-section'
+                    
+                    // Specific logic for each section type
+                    if (section === 'stationary-acoustic') {
+                        // Set input fields for acoustic section
+                        document.getElementById('acousticDeviceId').value = deviceId;
+                        document.getElementById('acousticSensorType').value = sensorType;
+                        // Clear previous data and messages
+                        acousticDataPoints = [];
+                        acousticApexChart.updateSeries([{ data: [] }]);
+                        document.getElementById('acousticMessages').innerHTML = '<p class="text-gray-500 text-center">No acoustic data loaded yet.</p>';
+                    } else if (section === 'stationary-chemical') {
+                        // Set input fields for chemical section
+                        document.getElementById('gasSensorId').value = deviceId;
+                        document.getElementById('gasType').value = sensorType;
+                        // Clear previous data and messages for historical data
+                        gasDataPoints = [];
+                        gasApexChart.updateSeries([{ data: [] }]);
+                        document.getElementById('gasMessages').innerHTML = '<p class="text-gray-500 text-center">No gas data loaded yet.</p>';
+                        // Ensure live stream is stopped when switching away
+                        disconnectMockGasStream();
+                    } else if (section === 'stationary-video') {
+                        document.getElementById('youtubeChannel').value = channel;
+                        document.getElementById('youtubeStreamContainer').innerHTML = '<p class="text-gray-500 text-center p-4">Click "Load Live Stream" to view.</p>';
+                        document.getElementById('youtubeMessages').innerHTML = '<p class="text-gray-500 text-center">No stream status yet.</p>';
+                    }
+                    // For other device sections (TurtleBot, DJI Drone, etc.),
+                    // you'll add similar initialization logic here.
+                } else {
+                    // For top-level device items (TurtleBot, DJI Drone, etc.)
+                    // You'll define how these sections are named (e.g., 'turtleBot-section')
+                    // and what content they display. For now, they just show placeholders.
+                    showSection(item.dataset.deviceType + '-section');
+                }
+            });
+        });
+
+        // --- Acoustic Data Fetching ---
+        document.getElementById('loadAcousticData').addEventListener('click', async () => {
+            const deviceId = document.getElementById('acousticDeviceId').value;
+            const sensorType = document.getElementById('acousticSensorType').value;
+            const limit = document.getElementById('acousticLimit').value;
+            const acousticMessages = document.getElementById('acousticMessages');
+
+            acousticMessages.innerHTML = '<p class="text-gray-500 text-center">Loading data...</p>';
+            acousticDataPoints = []; // Clear previous data
+            acousticApexChart.updateSeries([{ data: [] }]); // Clear chart
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/acoustic/query_records?device_id=${deviceId}&sensor_type=${sensorType}&limit=${limit}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.status && data.data && data.data.length > 0) {
+                    acousticMessages.innerHTML = ''; // Clear "Loading data..."
+                    data.data.forEach(record => {
+                        const timestamp = new Date(record.timestamp);
+                        const value = record.value;
+                        acousticDataPoints.push([timestamp.getTime(), value]); // ApexCharts expects milliseconds
+                        appendMessage('acousticMessages', `Device: ${record.device_id}, Type: ${record.sensor_type}, Value: ${value.toFixed(2)}, Time: ${timestamp.toLocaleTimeString()}`);
+                    });
+                    acousticApexChart.updateSeries([{ data: acousticDataPoints }]);
+                    appendMessage('acousticMessages', `Loaded ${data.record_count} acoustic records.`, 'info-message');
+                } else {
+                    appendMessage('acousticMessages', 'No acoustic records found for the given criteria.', 'info-message');
+                }
+            } catch (error) {
+                console.error("Error loading acoustic data:", error);
+                appendMessage('acousticMessages', `Error loading acoustic data: ${error.message}`, 'error-message');
+            }
+        });
+
+        // --- Gas Data Fetching (Historical) ---
+        document.getElementById('loadGasData').addEventListener('click', async () => {
+            const sensorId = document.getElementById('gasSensorId').value;
+            const gasType = document.getElementById('gasType').value;
+            const limit = document.getElementById('gasLimit').value;
+            const gasMessages = document.getElementById('gasMessages');
+
+            gasMessages.innerHTML = '<p class="text-gray-500 text-center">Loading data...</p>';
+            gasDataPoints = []; // Clear previous data
+            gasApexChart.updateSeries([{ data: [] }]); // Clear chart
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/influxdb_query/get_sensor_records?sensor_id=${sensorId}&gas_type=${gasType}&limit=${limit}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.status && data.data && data.data.length > 0) {
+                    gasMessages.innerHTML = '';
+                    data.data.forEach(record => {
+                        const timestamp = new Date(record.timestamp);
+                        const value = record.value;
+                        gasDataPoints.push([timestamp.getTime(), value]);
+                        appendMessage('gasMessages', `Sensor: ${record.sensor_id}, Type: ${record.gas_type}, Value: ${value.toFixed(2)}, Time: ${timestamp.toLocaleTimeString()}`);
+                    });
+                    gasApexChart.updateSeries([{ data: gasDataPoints }]);
+                    appendMessage('gasMessages', `Loaded ${data.record_count} gas records.`, 'info-message');
+                } else {
+                    appendMessage('gasMessages', 'No gas records found for the given criteria.', 'info-message');
+                }
+            } catch (error) {
+                console.error("Error loading gas data:", error);
+                appendMessage('gasMessages', `Error loading gas data: ${error.message}`, 'error-message');
+            }
+        });
+
+        // --- Gas Data Live Stream (WebSocket) ---
+        function connectMockGasStream() {
+            if (mockGasWs && mockGasWs.readyState === WebSocket.OPEN) {
+                appendMessage('gasMessages', '<p class="text-yellow-600">Mock Gas WebSocket is already connected.</p>', 'info-message');
+                return;
+            }
+
+            // Clear previous chart data and messages when connecting a new stream
+            gasDataPoints = [];
+            gasApexChart.updateSeries([{ data: [] }]);
+            document.getElementById('gasMessages').innerHTML = '<p class="text-gray-500 text-center">No gas data yet.</p>';
+
+            const sensorId = document.getElementById('gasSensorId').value;
+            const gasType = document.getElementById('gasType').value;
+            const intervalMs = 1000; // Hardcoded for mock stream, can be made configurable
+
+            const params = new URLSearchParams();
+            params.append('sensor_id', sensorId);
+            params.append('gas_type', gasType);
+            params.append('interval_ms', intervalMs);
+
+            const wsUrl = `ws://localhost:8000/ws/mock_stream?${params.toString()}`;
+            console.log("Connecting to mock gas stream WS URL:", wsUrl);
+            mockGasWs = new WebSocket(wsUrl);
+
+            mockGasWs.onopen = (event) => {
+                appendMessage('gasMessages', '<strong>Mock Gas Stream Connection opened!</strong>', 'info-message');
+                console.log("Mock Gas WebSocket opened!");
+            };
+
+            mockGasWs.onmessage = (event) => {
+                let messageContent = event.data;
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "mock_data" && data.data) {
+                        const reading = data.data;
+                        const timestamp = new Date(reading.timestamp);
+                        const value = reading.value;
+
+                        gasDataPoints.push([timestamp.getTime(), value]);
+                        const maxDataPoints = 20; // Keep consistent with previous logic
+                        if (gasDataPoints.length > maxDataPoints) {
+                            gasDataPoints.shift();
+                        }
+                        gasApexChart.updateSeries([{ data: gasDataPoints }], false); // false for `shouldUpdatePoints` for smoother stream
+
+                        // Dynamically update x-axis range to auto-scroll
+                        const latestTimestamp = timestamp.getTime();
+                        const newMin = latestTimestamp - (maxDataPoints * intervalMs);
+                        const newMax = latestTimestamp + intervalMs;
+                        gasApexChart.updateOptions({
+                            xaxis: { min: newMin, max: newMax }
+                        });
+
+                        appendMessage('gasMessages', `Sensor: ${reading.sensor_id}, Type: ${reading.gas_type}, Value: ${value.toFixed(2)}, Time: ${timestamp.toLocaleTimeString()}`);
+
+                    } else if (data.type === "info") {
+                        appendMessage('gasMessages', `<strong>Mock Stream Info:</strong> ${data.message}`, 'info-message');
+                    } else {
+                        appendMessage('gasMessages', `<strong>Server:</strong> ${JSON.stringify(data, null, 2)}`, 'info-message');
+                    }
+                } catch (e) {
+                    appendMessage('gasMessages', `<strong>Server (raw):</strong> ${event.data}`, 'info-message');
+                }
+            };
+
+            mockGasWs.onclose = (event) => {
+                appendMessage('gasMessages', `<strong>Mock Gas Stream Connection closed:</strong> Code: ${event.code}, Reason: ${event.reason || 'No reason'}`, 'info-message');
+                console.log("Mock Gas WebSocket closed:", event);
+                mockGasWs = null;
+            };
+
+            mockGasWs.onerror = (error) => {
+                appendMessage('gasMessages', `<strong>Mock Gas Stream WebSocket Error:</strong> ${error.message || 'Unknown error'}`, 'error-message');
+                console.error("Mock Gas Stream WebSocket error:", error);
+                mockGasWs = null;
+            };
+        }
+
+        function disconnectMockGasStream() {
+            if (mockGasWs) {
+                mockGasWs.close();
+            } else {
+                appendMessage('gasMessages', '<p class="text-yellow-600">Mock Gas WebSocket is not connected.</p>', 'info-message');
+            }
+        }
+
+        document.getElementById('startMockGasStream').addEventListener('click', connectMockGasStream);
+        document.getElementById('stopMockGasStream').addEventListener('click', disconnectMockGasStream);
+
+
+        // --- YouTube Live Stream Fetching ---
+        document.getElementById('loadYouTubeStream').addEventListener('click', async () => {
+            const channel = document.getElementById('youtubeChannel').value;
+            const youtubeStreamContainer = document.getElementById('youtubeStreamContainer');
+            const youtubeMessages = document.getElementById('youtubeMessages');
+
+            youtubeStreamContainer.innerHTML = '<p class="text-gray-500 text-center p-4">Loading stream info...</p>';
+            youtubeMessages.innerHTML = ''; // Clear previous messages
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/youtube/get_live_streams?device_id=5&channel=${encodeURIComponent(channel)}`);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                if (data.status && data.data && data.data.length > 0) {
+                    const stationaryVideo = data.data.find(d => d.deviceId == 5 && d.source === 'youtube'); // Find the specific stationary video
+                    if (stationaryVideo && stationaryVideo.streamingURL) {
+                        const videoId = stationaryVideo.streamingURL;
+                        youtubeStreamContainer.innerHTML = `
+                            <iframe
+                                src="https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1"
+                                frameborder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen
+                            ></iframe>
+                        `;
+                        appendMessage('youtubeMessages', `Live stream loaded for channel: ${channel} (Video ID: ${videoId})`, 'info-message');
+                    } else {
+                        youtubeStreamContainer.innerHTML = '<p class="text-gray-500 text-center p-4">No live stream found for this channel currently.</p>';
+                        appendMessage('youtubeMessages', `No active live stream found for channel: ${channel}`, 'info-message');
+                    }
+                } else {
+                    youtubeStreamContainer.innerHTML = '<p class="text-gray-500 text-center p-4">Failed to retrieve stream information.</p>';
+                    appendMessage('youtubeMessages', 'Failed to retrieve stream information from API.', 'error-message');
+                }
+            } catch (error) {
+                console.error("Error loading YouTube stream:", error);
+                youtubeStreamContainer.innerHTML = '<p class="text-gray-500 text-center p-4">Error loading stream. Check console.</p>';
+                appendMessage('youtubeMessages', `Error loading YouTube stream: ${error.message}`, 'error-message');
+            }
+        });
+
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Simulate click on "Stationary -> Acoustic" to load its section initially
+            const initialItem = document.querySelector('.sidebar-item[data-section="stationary-acoustic"]');
+            if (initialItem) {
+                initialItem.click();
+            }
+        });
+
+    </script>
+</body>
+</html>
