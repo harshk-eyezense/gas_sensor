@@ -83,52 +83,102 @@ def generate_mock_reading(sensor_id: str, gas_type: str) -> GasSensorReading:
     
 # websocket endpoint for continuous mock data streaming (kept and will be visualized )
 @router.websocket("/mock_stream")
-async def mock_stream_endpoint(
-    websocket: WebSocket,
-    sensor_id: str = Query("mock_sensor_01", description="Sensor ID for mock data"),
-    gas_type: str = Query("CO2", description="Gas type for mock data"),
-    interval_ms: int = Query(1000, ge= 50, description="Interva; between data points in milliseconds")
-
-):
-    """
-    websocket endpoint for continuous streaming of mock sensor data.
-    Generates, writes to InfluxDB, sends data at specified intervals.
-    """
+async def mock_stream_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print(f"Mock streaming Websocket connection established: {websocket.client}")
-    await websocket.send_text(json.dumps({"type": "info", "message": f"Starting mock stream for {sensor_id}/{gas_type} at {interval_ms}ms intervals."}))
+
+    # ✅ WebSocket-safe query param parsing
+    params = websocket.query_params
+    sensor_id = params.get("sensor_id", "mock_sensor_01")
+    gas_type = params.get("gas_type", "CO2")
+
+    try:
+        interval_ms = int(params.get("interval_ms", 1000))
+        interval_ms = max(interval_ms, 50)
+    except ValueError:
+        interval_ms = 1000
+
+    print(
+        f"Mock stream connected: {websocket.client} | "
+        f"{sensor_id} | {gas_type} | {interval_ms}ms"
+    )
+
+    await websocket.send_text(json.dumps({
+        "type": "info",
+        "message": f"Streaming {sensor_id}/{gas_type} every {interval_ms}ms"
+    }))
 
     try:
         while True:
             mock_reading = generate_mock_reading(sensor_id, gas_type)
 
-            print(f"DEBUG: Attempting to write mock data to influxdb: {mock_reading.value}")
+            # Write to InfluxDB
+            write_sensor_reading(
+                sensor_id=mock_reading.sensor_id,
+                gas_type=mock_reading.gas_type,
+                value=mock_reading.value,
+                timestamp=mock_reading.timestamp
+            )
 
-            try:
-                write_sensor_reading(
-                    sensor_id=mock_reading.sensor_id,
-                    gas_type=mock_reading.gas_type,
-                    value=mock_reading.value,
-                    timestamp=mock_reading.timestamp
-                )
-                print(f"Successfully wrote mock data point to InfluxDB: {mock_reading.value}")
-            except Exception as e:
-                print(f"ERROR: Failed to write mock data point to InfluxDB: {e}")
-                import traceback
-                traceback.print_exc()
-
-            message_dict = mock_reading.model_dump(mode='json')
-
+            # Send to client
             await websocket.send_text(json.dumps({
                 "type": "mock_data",
-                "data": message_dict
+                "data": mock_reading.model_dump(mode="json")
             }))
-            print(f"Sent mock data to {websocket.client}: {mock_reading.value}")
-            await asyncio.sleep(interval_ms / 1000.0)
+
+            await asyncio.sleep(interval_ms / 1000)
+
     except WebSocketDisconnect:
-        print(f"Client {websocket.client} disconnected from mock stream.")
+        print(f"Mock stream disconnected: {websocket.client}")
+
     except Exception as e:
-        print(f"Error in mock streaming endpoint for client {websocket.client}: {e}")
-        import traceback
-        traceback.print_exc()
-        await websocket.close(code=1011, reason=f"Server error: {e}")  
+        print(f"Mock stream error: {e}")
+        await websocket.close(code=1011)
+# async def mock_stream_endpoint(
+#     websocket: WebSocket,
+#     sensor_id: str = Query("mock_sensor_01", description="Sensor ID for mock data"),
+#     gas_type: str = Query("CO2", description="Gas type for mock data"),
+#     interval_ms: int = Query(1000, ge= 50, description="Interva; between data points in milliseconds")
+
+# ):
+#     """
+#     websocket endpoint for continuous streaming of mock sensor data.
+#     Generates, writes to InfluxDB, sends data at specified intervals.
+#     """
+#     await websocket.accept()
+#     print(f"Mock streaming Websocket connection established: {websocket.client}")
+#     await websocket.send_text(json.dumps({"type": "info", "message": f"Starting mock stream for {sensor_id}/{gas_type} at {interval_ms}ms intervals."}))
+
+#     try:
+#         while True:
+#             mock_reading = generate_mock_reading(sensor_id, gas_type)
+
+#             print(f"DEBUG: Attempting to write mock data to influxdb: {mock_reading.value}")
+
+#             try:
+#                 write_sensor_reading(
+#                     sensor_id=mock_reading.sensor_id,
+#                     gas_type=mock_reading.gas_type,
+#                     value=mock_reading.value,
+#                     timestamp=mock_reading.timestamp
+#                 )
+#                 print(f"Successfully wrote mock data point to InfluxDB: {mock_reading.value}")
+#             except Exception as e:
+#                 print(f"ERROR: Failed to write mock data point to InfluxDB: {e}")
+#                 import traceback
+#                 traceback.print_exc()
+
+#             message_dict = mock_reading.model_dump(mode='json')
+
+#             await websocket.send_text(json.dumps({
+#                 "type": "mock_data",
+#                 "data": message_dict
+#             }))
+#             print(f"Sent mock data to {websocket.client}: {mock_reading.value}")
+#             await asyncio.sleep(interval_ms / 1000.0)
+#     except WebSocketDisconnect:
+#         print(f"Client {websocket.client} disconnected from mock stream.")
+#     except Exception as e:
+#         print(f"Error in mock streaming endpoint for client {websocket.client}: {e}")
+#         import traceback
+#         traceback.print_exc()
+#         await websocket.close(code=1011, reason=f"Server error: {e}")  
